@@ -41,6 +41,16 @@ function createMockOllamaServer(mode = "batch") {
         return;
       }
 
+      if (req.url === "/api/chat") {
+        // Echo the user prompt back so tests can verify the context that reached the LLM.
+        const userMsg = parsed.messages.find((m) => m.role === "user");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          message: { role: "assistant", content: `MOCK ANSWER based on: ${userMsg.content}` },
+        }));
+        return;
+      }
+
       if (req.url === "/api/embeddings") {
         const embedding = fakeVector(parsed.prompt);
         res.writeHead(200, { "Content-Type": "application/json" });

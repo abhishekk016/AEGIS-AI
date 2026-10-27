@@ -7,7 +7,7 @@ aegis-ai/
 ├── backend/           # Node/Express — API, orchestration, MongoDB (Abhishek)
 ├── python-services/    # FastAPI — PDF extraction via PyMuPDF (Harshit)
 ├── docs/               # Team documentation, synopsis, diagrams
-└── frontend/           # NOT YET CREATED — React (Harshvardhan starts scaffold)
+└── frontend/           # React + Vite UI: upload, document status, chat with citations
 ```
 
 ## Quick start
@@ -29,8 +29,9 @@ See `backend/README.md` for the full architecture note.
 - [x] PDF parsing (Python/FastAPI + PyMuPDF) — Harshit — tested end-to-end
 - [x] Code parsing (Tree-sitter, JS + Python) — Himanshu — tested end-to-end, 11 automated tests, `.gitignore`-aware, `node_modules`-safe
 - [ ] Embeddings + ChromaDB — Harshvardhan
-- [ ] Frontend — not yet created
-- [ ] Real RAG retrieval + LLM wiring in `queryController.js` — October
+- [x] Frontend (React + Vite): upload, live document status, chat with clickable citations — run `cd frontend && npm install && npm run dev`
+- [x] Repository insight (synopsis objective 5): `GET /api/documents/:id/insight` + a Dependencies/Folders view in the UI — import graph, circular-import detection, per-file symbols. JS/Python only. Not covered: links between documents (PDFs) and code files
+- [x] RAG query endpoint (retrieve + local LLM + citations) — needs a real Ollama run to judge answer quality
 - [ ] TypeScript support in code parsing — blocked on an upstream dependency conflict (see `backend/API_CONTRACT.md`)
 
 ## Docs

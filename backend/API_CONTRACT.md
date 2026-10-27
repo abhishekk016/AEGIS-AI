@@ -38,19 +38,52 @@ List all uploaded documents with current status.
 Poll ingestion status for one document. `status` transitions:
 `uploaded → parsing → embedding → ready` (or `failed`, with `errorMessage` set).
 
-### `POST /api/query`
+### `GET /api/documents/:id/insight`
+Project structure and import graph for an uploaded **code repository** (`sourceType: "code_repo"`).
+Computed on demand from the stored zip and cached in memory.
 ```json
-// request
-{ "question": "What does the parseRepo function do?" }
-
-// response
 {
-  "answer": "…",
-  "sources": ["chunk_id_1", "chunk_id_2"],
-  "queryId": "…"
+  "name": "myrepo.zip",
+  "fileCount": 44, "totalLines": 3152,
+  "languages": { "javascript": 39, "python": 5 },
+  "nodes": [
+    { "id": "src/app.js", "path": "src/app.js", "language": "javascript", "lines": 120,
+      "symbols": [ { "name": "createApp", "kind": "function", "line": 3 } ] }
+  ],
+  "edges": [ { "from": "src/app.js", "to": "src/utils/math.js" }, { "from": "a.js", "to": "b.js", "cyclic": true } ],
+  "circularImports": 1,
+  "external": [ { "name": "express", "count": 5 } ],
+  "skippedLargeFiles": 0, "truncated": false
 }
 ```
-Currently returns a stub answer — wired to real retrieval + Ollama in October.
+- An edge `from -> to` means "`from` imports `to`". `cyclic: true` marks the one edge that closes an import cycle.
+- `external` lists packages imported from outside the project (Node builtins and the Python stdlib are excluded).
+- `400` if the document is not a code repository, `404` if unknown / the upload is gone from disk, `422` if the zip can't be read.
+- Limits: JavaScript/JSX and Python only. JS imports are linked only when relative (`./x`), so path aliases show up as external. Python imports resolve from the importing file's folder and its ancestors, then `src/`. Computed paths (`require(name)`) can't be resolved statically. Files over 1 MB are skipped; at most 2,000 files are analyzed.
+
+### `POST /api/query`
+Full RAG flow: embeds the question, retrieves the nearest chunks from ChromaDB,
+builds a grounded prompt, and asks the local LLM (Ollama).
+```json
+// request  (topK optional, 1-20, default 5)
+{ "question": "What does the parseRepo function do?", "topK": 5 }
+
+// response 200
+{
+  "answer": "parseRepo walks the repo and ... [1]",
+  "sources": ["<docId>-0", "<docId>-4"],
+  "citations": [
+    { "ref": 1, "id": "<docId>-0", "location": "src/app.js, lines 3-7", "distance": 0.12 },
+    { "ref": 2, "id": "<docId>-4", "location": "paper.pdf, page 3", "distance": 0.31 }
+  ],
+  "queryId": "…",
+  "latencyMs": 4210
+}
+```
+- `answer` cites excerpts as `[1]`, `[2]`, matching `citations[].ref`.
+- If nothing has been ingested yet, `answer` says so and `citations` is `[]` (the LLM is not called).
+- `400` for a missing/blank `question`; `502` with `details` if Ollama or ChromaDB is unreachable.
+- `queryId` is `null` if saving the query log to MongoDB failed; the answer is still returned.
 
 ---
 

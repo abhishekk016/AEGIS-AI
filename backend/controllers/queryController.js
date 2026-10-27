@@ -1,41 +1,54 @@
 const QueryLog = require("../models/QueryLog");
+const { answerQuestion } = require("../services/ragService");
 
 /**
  * POST /api/query
- * Full RAG flow (October deliverable):
- *   1. Embed the question (embeddingService)
- *   2. Retrieve top-k relevant chunks from ChromaDB (chromaService)
- *   3. Build a prompt with retrieved context
- *   4. Call local LLM via Ollama (llmService)
- *   5. Return answer + sources
+ * body: { question: string, topK?: number }
  *
- * Currently a stub so the frontend can integrate against a stable
- * contract before RAG logic is implemented.
+ * Runs the full RAG flow (embed question -> retrieve from ChromaDB ->
+ * grounded prompt -> local LLM) and returns the answer with citations.
  */
 async function askQuestion(req, res) {
-  const { question } = req.body;
+  const { question, topK } = req.body;
 
-  if (!question || typeof question !== "string") {
-    return res.status(400).json({ error: "`question` (string) is required." });
+  if (!question || typeof question !== "string" || !question.trim()) {
+    return res.status(400).json({ error: "`question` (non-empty string) is required." });
   }
 
+  const k = Number.isInteger(topK) && topK > 0 && topK <= 20 ? topK : undefined;
   const startTime = Date.now();
 
-  // TODO: replace with real retrieval + Ollama call
-  const answer = `[stub response] Received question: "${question}". RAG pipeline not yet wired up.`;
-  const retrievedChunkIds = [];
+  let result;
+  try {
+    result = await answerQuestion(question.trim(), { topK: k });
+  } catch (err) {
+    console.error("[query] failed:", err.message);
+    return res.status(502).json({ error: "Query failed", details: err.message });
+  }
 
-  const log = await QueryLog.create({
-    question,
-    answer,
-    retrievedChunkIds,
-    latencyMs: Date.now() - startTime,
-  });
+  const latencyMs = Date.now() - startTime;
+
+  // Logging is best-effort: a Mongo hiccup shouldn't discard a finished answer.
+  let queryId = null;
+  try {
+    const log = await QueryLog.create({
+      question,
+      answer: result.answer,
+      retrievedChunkIds: result.retrievedChunkIds,
+      modelUsed: result.model || undefined,
+      latencyMs,
+    });
+    queryId = log._id;
+  } catch (err) {
+    console.error("[query] could not save query log:", err.message);
+  }
 
   return res.json({
-    answer,
-    sources: retrievedChunkIds,
-    queryId: log._id,
+    answer: result.answer,
+    sources: result.retrievedChunkIds,
+    citations: result.citations,
+    queryId,
+    latencyMs,
   });
 }
 

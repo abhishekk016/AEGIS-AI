@@ -46,11 +46,11 @@ in-process. ChromaDB is called directly over its own REST API.
 - [x] `services/embeddingService.js` — Harshvardhan (Ollama client, batch + legacy fallback, tested against a mock Ollama server since real Ollama isn't installable in this dev sandbox — **run `scripts/check-retrieval.js` against a real Ollama before trusting semantic quality**)
 - [x] `services/chromaService.js` — Harshvardhan (ChromaDB REST client, verified live against a real running Chroma server)
 - [x] **Full parse → embed → store pipeline wired end-to-end** in `ingestionService.js` — verified with a real PDF and real ChromaDB (stand-in embedder used only because Ollama can't run in the dev sandbox that built this)
-- [ ] Query endpoint (`queryController.js`) still returns a stub — real retrieval + Ollama LLM call is October's work
+- [x] Query endpoint (`queryController.js` + `ragService.js` + `llmService.js`): embed question → retrieve top-k from ChromaDB → grounded prompt → local LLM → answer with citations (tested against mock Ollama/Chroma; needs a real Ollama run to judge answer quality)
+- [x] Repository insight: `services/repoInsightService.js` + `GET /api/documents/:id/insight` (import graph, cycles, symbols)
 - [ ] TypeScript support in `codeParser.js` — blocked on upstream `tree-sitter-typescript` peer-dep conflict
-- [ ] Frontend — not started
 
-**21 automated tests passing** across `codeParser`, `embeddingService`, and `chromaService` (`npm test`).
+**46 automated tests passing** across `codeParser`, `embeddingService`, `chromaService`, `ragService`, `queryController`, `repoInsightService` and `insightController` (`npm test`).
 
 ## API contract
 See [`API_CONTRACT.md`](./API_CONTRACT.md) — the interface everyone builds against.
